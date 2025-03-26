@@ -1,5 +1,10 @@
 # Environment
 .venv
+__pycache__
+*.pyc
 
 # Tools
 .ruff_cache
+
+# Secrets
+.env

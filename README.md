@@ -2,7 +2,7 @@
 
 This repo contains my (Phil Mayer's) solution for Lendflow's backend skills assessment.
 
-## Requirements
+## Setup
 
 ### Local Setup
 
@@ -10,6 +10,12 @@ This repo contains my (Phil Mayer's) solution for Lendflow's backend skills asse
 - Python 3.12.x
 
 ### Docker
+
+- There might be a required version of Docker Desktop/Compose for `watch`.
+
+### Steps
+
+1. Copy `.env.example` to `.env` and enter values for the required key-value pairs.
 
 ## Technical Notes
 
