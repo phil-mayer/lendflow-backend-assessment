@@ -15,6 +15,15 @@ The following steps detail how to start the application with Docker. To use the 
 2. Fetch and build the Docker images via `docker compose build`. While we could simply run `docker compose up` at this point, this allows us to run the database migrations before taking the entire stack up.
 3. Run `docker compose run web bash -c "python manage.py migrate"` to temporarily start the database and migrate it.
 4. Run `docker compose up` (optionally with the `-d` flag to detach) to start the application.
+5. Run `docker compose run web bash -c "python manage.py createsuperuser"` to create a user account for yourself.
+
+### Using the Application
+
+Once the application is running, navigate to [http://localhost:8000/admin/login/](http://localhost:8000/admin/login/) and log in with your user account created in the last step. On successful login, a cookie will be set in the browser. API requests can now be made directly using the same session.
+
+> 📘 Side note: If the application had permissions, I would have recommended creating a second non-super user for testing. I chose not to implement fine-grained permissions at this point due to time, but also because Django permissions need to be associated with a model (i.e. a Django "content-type"). The permissions can then be understood as actions on objects or collections of objects, e.g. "Can list books".
+
+To query for New York Times Best Seller books, navigate to [http://localhost:8000/collections/nyt/books/best-sellers](http://localhost:8000/collections/nyt/books/best-sellers).
 
 ### Development Setup (Optional)
 
