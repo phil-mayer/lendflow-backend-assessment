@@ -1,0 +1,13 @@
+# Environment
+/.venv
+__pycache__
+*.pyc
+
+# Secrets
+.env
+.env.example
+
+# Docker
+.dockerignore
+Dockerfile
+compose.yaml
