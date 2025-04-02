@@ -25,12 +25,11 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
         - author query param
         - isbn[] query param
         - title query param
-        - return HTTP 401 if the user is not authenticated (currently returning HTTP 403 by default).
         """
         try:
             data = NYTApiService.get_best_sellers()
         except Exception as e:
-            logger.warning("[NYTBestSellersViewSet] Failed to retrieve NYT Best Sellers")
-            raise ServerError(detail="Failed to retrieve data from source") from e
+            logger.error("[NYTBestSellersViewSet] Failed to retrieve NYT Best Sellers", exc_info=True)
+            raise ServerError(detail="Failed to retrieve data from source API") from e
 
         return Response(data={"num_results": data.get("num_results"), "results": data.get("results")})
