@@ -87,7 +87,7 @@ REST_FRAMEWORK = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "New York Times Best Sellers API",
-    "DESCRIPTION": "API to fetch the New York Times Best Sellers",
+    "DESCRIPTION": "API to fetch the New York Times Best Sellers. Data provided by The New York Times.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }

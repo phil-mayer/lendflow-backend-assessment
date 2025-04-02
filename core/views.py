@@ -82,6 +82,8 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
         proxies the request to NYT's API, which uses a fixed page size of 20. For this reason, requests to this endpoint
         must use the returned `num_results` key to paginate through the results with the `offset` query parameter.
 
+        Data provided by The New York Times.
+
         TODO: implement the following:
 
         - offset query param
