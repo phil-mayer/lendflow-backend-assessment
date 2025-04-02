@@ -1,4 +1,7 @@
+from unittest.mock import Mock, patch
+
 import pytest
+from requests.exceptions import Timeout as TimeoutException
 
 
 @pytest.mark.django_db
@@ -13,7 +16,7 @@ class TestNYTBestSellersViewSetView:
         """
         response = client.get("/api/v1/nyt-best-sellers/")
         assert response.status_code == 403
-        assert response.json() == { "detail": "Authentication credentials were not provided." }
+        assert response.json() == {"detail": "Authentication credentials were not provided."}
 
     def test_endpoint_returns_error_for_disallowed_verbs(self, client, django_user_model):
         """
@@ -24,16 +27,71 @@ class TestNYTBestSellersViewSetView:
 
         response_post = client.post("/api/v1/nyt-best-sellers/", data={})
         assert response_post.status_code == 405
-        assert response_post.json() == { "detail": 'Method "POST" not allowed.' }
+        assert response_post.json() == {"detail": 'Method "POST" not allowed.'}
 
         response_patch = client.patch("/api/v1/nyt-best-sellers/", data={})
         assert response_patch.status_code == 405
-        assert response_patch.json() == { "detail": 'Method "PATCH" not allowed.' }
+        assert response_patch.json() == {"detail": 'Method "PATCH" not allowed.'}
 
         response_put = client.put("/api/v1/nyt-best-sellers/", data={})
         assert response_put.status_code == 405
-        assert response_put.json() == { "detail": 'Method "PUT" not allowed.' }
+        assert response_put.json() == {"detail": 'Method "PUT" not allowed.'}
 
         response_delete = client.delete("/api/v1/nyt-best-sellers/")
         assert response_delete.status_code == 405
-        assert response_delete.json() == { "detail": 'Method "DELETE" not allowed.' }
+        assert response_delete.json() == {"detail": 'Method "DELETE" not allowed.'}
+
+    def test_endpoint_returns_error_if_proxy_unsuccessful(self, client, django_user_model):
+        """
+        Endpoint returns HTTP 500 if the source API returns a response code greater than 200 and less than 500 (error
+        could be our fault). Returns HTTP 502 if the source API returns a 5XX response code. Returns HTTP 504 if the
+        proxy request timed out.
+        """
+        user = django_user_model.objects.create_user(username="user+1@test.com", password="test123")
+        client.force_login(user)
+
+        with patch(
+            "requests.get",
+            Mock(
+                side_effect=[
+                    Mock(status_code=204),
+                    Mock(status_code=301),
+                    Mock(status_code=400),
+                    Mock(status_code=500),
+                    TimeoutException(),
+                ]
+            ),
+        ) as mock_integration_http_call:
+            assert mock_integration_http_call.call_count == 0
+
+            response_with_204_side_effect = client.get("/api/v1/nyt-best-sellers/")
+
+            assert mock_integration_http_call.call_count == 1
+            assert response_with_204_side_effect.status_code == 500
+            assert response_with_204_side_effect.json() == {"detail": "Failed to retrieve data from source API."}
+
+            response_with_301_side_effect = client.get("/api/v1/nyt-best-sellers/")
+
+            assert mock_integration_http_call.call_count == 2
+            assert response_with_301_side_effect.status_code == 500
+            assert response_with_301_side_effect.json() == {"detail": "Failed to retrieve data from source API."}
+
+            response_with_400_side_effect = client.get("/api/v1/nyt-best-sellers/")
+
+            assert mock_integration_http_call.call_count == 3
+            assert response_with_400_side_effect.status_code == 500
+            assert response_with_400_side_effect.json() == {"detail": "Failed to retrieve data from source API."}
+
+            response_with_500_side_effect = client.get("/api/v1/nyt-best-sellers/")
+
+            assert mock_integration_http_call.call_count == 4
+            assert response_with_500_side_effect.status_code == 502
+            assert response_with_500_side_effect.json() == {"detail": "Source API error."}
+
+            response_with_timeout_side_effect = client.get("/api/v1/nyt-best-sellers/")
+
+            assert mock_integration_http_call.call_count == 5
+            assert response_with_timeout_side_effect.status_code == 504
+            assert response_with_timeout_side_effect.json() == {
+                "detail": "Request timed out while retrieving data from source API."
+            }

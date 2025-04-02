@@ -3,6 +3,8 @@ from os import getenv
 
 import requests
 
+from .exceptions import BadGatewayException
+
 logger = logging.getLogger(__name__)
 
 
@@ -11,13 +13,14 @@ class NYTApiService:
     Service for making calls to the New York Times API. Responsible for collecting query parameters and configuration,
     making requests, and handling responses.
     """
-    def get_best_sellers():
+
+    def get_best_sellers(filter_criteria):
         """
         Retrieve a list of NYT Books Best Sellers from the source API. Any response code other than HTTP 200 (OK) is
         considered an error because HTTP 200 is the only listed successful response code on the NYT API documentation
         site.
         """
-        params = {"api-key": getenv("NYT_API_KEY")}
+        params = {**filter_criteria, "api-key": getenv("NYT_API_KEY")}
         response = requests.get(
             url=getenv("NYT_BEST_SELLERS_ENDPOINT_URL"),
             params=params,
@@ -46,4 +49,4 @@ class NYTApiService:
             raise Exception("Client error")
 
         # HTTP 5xx response codes signal an error on the NYT side.
-        raise Exception("Target API error")
+        raise BadGatewayException("Target API error")
