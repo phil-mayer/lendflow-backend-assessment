@@ -133,11 +133,16 @@ class TestNYTBestSellersViewSetView:
         self, client, django_user_model, book_beren_and_luthien, book_the_fall_of_goldolin
     ):
         """
-        Endpoint returns HTTP 200 if the `author` query parameter is provided and passes validation. Returns HTTP 400 if
-        the `author` query parameter is passed with a length greater than 32 characters.
+        Endpoint returns HTTP 400 if the `author` query parameter is passed with a length greater than 32 characters.
         """
         user = django_user_model.objects.create_user(username="user+1@test.com", password="test123")
         client.force_login(user)
+
+        response_long_param = client.get(
+            f"/api/v1/nyt-best-sellers/?{urlencode({'author': 'THIS_STRING_IS_33_CHARACTERS_BBBB'})}"
+        )
+        assert response_long_param.status_code == 400
+        assert response_long_param.json() == {"author": ["Ensure this field has no more than 32 characters."]}
 
         with patch(
             "requests.get",
@@ -153,39 +158,35 @@ class TestNYTBestSellersViewSetView:
         ) as mock_integration_http_call:
             assert mock_integration_http_call.call_count == 0
 
-            response_valid_query_params = client.get(
-                f"/api/v1/nyt-best-sellers/?{urlencode({'author': 'JRR Tolkien'})}"
-            )
+            response_valid_param = client.get(f"/api/v1/nyt-best-sellers/?{urlencode({'author': 'JRR Tolkien'})}")
 
             assert mock_integration_http_call.call_count == 1
-            assert response_valid_query_params.status_code == 200
-            assert response_valid_query_params.json() == {
+            assert response_valid_param.status_code == 200
+            assert response_valid_param.json() == {
                 "num_results": 2,
                 "results": [book_beren_and_luthien, book_the_fall_of_goldolin],
             }
 
-            # Boundary case.
-            response_valid_query_params = client.get(
+            response_valid_param_boundary = client.get(
                 f"/api/v1/nyt-best-sellers/?{urlencode({'author': 'A_32_CHARACTER_LONG_STRING_AAAAA'})}"
             )
 
             assert mock_integration_http_call.call_count == 2
-            assert response_valid_query_params.status_code == 200
-            # Repetitive to make sure the fixture data is actually returned.
-            assert response_valid_query_params.json() == {"num_results": 0, "results": []}
-
-        response = client.get(f"/api/v1/nyt-best-sellers/?{urlencode({'author': 'THIS_STRING_IS_33_CHARACTERS_BBBB'})}")
-        assert mock_integration_http_call.call_count == 2
-        assert response.status_code == 400
-        assert response.json() == {"author": ["Ensure this field has no more than 32 characters."]}
+            assert response_valid_param_boundary.status_code == 200
+            assert response_valid_param_boundary.json() == {"num_results": 0, "results": []}
 
     def test_endpoint_validates_the_title_query_param(self, client, django_user_model, book_with_long_title):
         """
-        Endpoint returns HTTP 200 if the `title` query parameter is provided and passes validation. Returns HTTP 400 if
-        the `title` query parameter is passed with a length greater than 128 characters.
+        Endpoint returns HTTP 400 if the `title` query parameter is passed with a length greater than 128 characters.
         """
         user = django_user_model.objects.create_user(username="user+1@test.com", password="test123")
         client.force_login(user)
+
+        response_long_param = client.get(
+            f"/api/v1/nyt-best-sellers/?{urlencode({'title': 'Another Extremely Long Title That Exceeds the 128 Character Limit for this Test Case: The Epic Story of How I Wrote a Very Long String'})}"  # noqa: E501
+        )
+        assert response_long_param.status_code == 400
+        assert response_long_param.json() == {"title": ["Ensure this field has no more than 128 characters."]}
 
         with patch(
             "requests.get",
@@ -195,26 +196,67 @@ class TestNYTBestSellersViewSetView:
         ) as mock_integration_http_call:
             assert mock_integration_http_call.call_count == 0
 
-            response_valid_query_params = client.get(
+            response_valid_param = client.get(
                 f"/api/v1/nyt-best-sellers/?{urlencode({'title': 'The Life and Times of a Test Author'})}"
             )
 
             assert mock_integration_http_call.call_count == 1
-            assert response_valid_query_params.status_code == 200
-            assert response_valid_query_params.json() == {"num_results": 1, "results": [book_with_long_title]}
+            assert response_valid_param.status_code == 200
+            assert response_valid_param.json() == {"num_results": 1, "results": [book_with_long_title]}
 
-            # Boundary case.
-            response_valid_query_params = client.get(
+            response_valid_param_boundary = client.get(
                 f"/api/v1/nyt-best-sellers/?{urlencode({'title': 'The Life and Times of a Test Author: A Test Data Story Told as an Epic Poem with Supplementary Commentary by Several Other Test '})}"  # noqa: E501
             )
 
             assert mock_integration_http_call.call_count == 2
-            assert response_valid_query_params.status_code == 200
-            assert response_valid_query_params.json() == {"num_results": 1, "results": [book_with_long_title]}
+            assert response_valid_param_boundary.status_code == 200
+            assert response_valid_param_boundary.json() == {"num_results": 1, "results": [book_with_long_title]}
 
-        response = client.get(
-            f"/api/v1/nyt-best-sellers/?{urlencode({'title': 'Another Extremely Long Title That Exceeds the 128 Character Limit for this Test Case: The Epic Story of How I Wrote a Very Long String'})}"  # noqa: E501
-        )
-        assert mock_integration_http_call.call_count == 2
-        assert response.status_code == 400
-        assert response.json() == {"title": ["Ensure this field has no more than 128 characters."]}
+    def test_endpoint_validates_the_offset_query_param(self, client, django_user_model, book_the_fall_of_goldolin):
+        """
+        Endpoint returns HTTP 400 if the `offset` query parameter is passed with a negative value, or a value that is
+        not a multiple of 20 (the source API's fixed page size).
+        """
+        user = django_user_model.objects.create_user(username="user+1@test.com", password="test123")
+        client.force_login(user)
+
+        response_both_errors = client.get(f"/api/v1/nyt-best-sellers/?{urlencode({'offset': -1})}")
+        assert response_both_errors.status_code == 400
+        assert response_both_errors.json() == {
+            "offset": ["Ensure this value is a multiple of 20.", "Ensure this value is greater than or equal to 0."]
+        }
+
+        response_negative = client.get(f"/api/v1/nyt-best-sellers/?{urlencode({'offset': -20})}")
+        assert response_negative.status_code == 400
+        assert response_negative.json() == {"offset": ["Ensure this value is greater than or equal to 0."]}
+
+        response_not_multiple_of_20 = client.get(f"/api/v1/nyt-best-sellers/?{urlencode({'offset': 5})}")
+        assert response_not_multiple_of_20.status_code == 400
+        assert response_not_multiple_of_20.json() == {"offset": ["Ensure this value is a multiple of 20."]}
+
+        with patch(
+            "requests.get",
+            Mock(
+                side_effect=[
+                    Mock(status_code=200, json=lambda: {"num_results": 1, "results": [book_the_fall_of_goldolin]}),
+                    Mock(status_code=200, json=lambda: {"num_results": 0, "results": []}),
+                ]
+            ),
+        ) as mock_integration_http_call:
+            assert mock_integration_http_call.call_count == 0
+
+            response_zero_offset = client.get(
+                f"/api/v1/nyt-best-sellers/?{urlencode({'offset': 0, 'title': 'THE FALL OF GONDOLIN'})}"
+            )
+
+            assert mock_integration_http_call.call_count == 1
+            assert response_zero_offset.status_code == 200
+            assert response_zero_offset.json() == {"num_results": 1, "results": [book_the_fall_of_goldolin]}
+
+            response_offset_above_result_limit = client.get(
+                f"/api/v1/nyt-best-sellers/?{urlencode({'offset': 20, 'title': 'THE FALL OF GONDOLIN'})}"
+            )
+
+            assert mock_integration_http_call.call_count == 2
+            assert response_offset_above_result_limit.status_code == 200
+            assert response_offset_above_result_limit.json() == {"num_results": 0, "results": []}

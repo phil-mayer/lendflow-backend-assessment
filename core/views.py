@@ -3,6 +3,7 @@ import logging
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, OpenApiTypes, extend_schema
 from requests.exceptions import Timeout as TimeoutException
 from rest_framework import permissions, serializers, status, viewsets
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .exceptions import BadGatewayException, GatewayTimeoutException, ServerException
@@ -21,7 +22,14 @@ class _BestSellersFilterSerializer(serializers.Serializer):
     Serializer class for the allowed filter criteria (via query params).
     """
 
+    def _validate_offset(value):
+        if not value % 20 == 0:
+            raise ValidationError(detail="Ensure this value is a multiple of 20.")
+        else:
+            return
+
     author = serializers.CharField(max_length=32, required=False)
+    offset = serializers.IntegerField(min_value=0, required=False, validators=[_validate_offset])
     title = serializers.CharField(max_length=128, required=False)
 
 
@@ -71,6 +79,13 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
                 location=OpenApiParameter.QUERY,
             ),
             OpenApiParameter(
+                name="offset",
+                description="Result offset. The source API has a fixed page size of 20, so this must be a multiple of 20.",  # noqa: E501
+                required=False,
+                type=int,
+                location=OpenApiParameter.QUERY,
+            ),
+            OpenApiParameter(
                 name="title",
                 description="Book title, up to a maximum of 128 characters.",
                 required=False,
@@ -104,13 +119,14 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
 
         TODO: implement the following:
 
-        - offset query param
         - isbn[] query param
         - caching
         """
         filter_params = {}
         if "author" in request.query_params:
             filter_params["author"] = request.query_params["author"]
+        if "offset" in request.query_params:
+            filter_params["offset"] = request.query_params["offset"]
         if "title" in request.query_params:
             filter_params["title"] = request.query_params["title"]
 
