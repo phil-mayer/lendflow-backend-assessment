@@ -22,6 +22,7 @@ class _BestSellersFilterSerializer(serializers.Serializer):
     """
 
     author = serializers.CharField(max_length=32, required=False)
+    title = serializers.CharField(max_length=128, required=False)
 
 
 class _IsbnSerializer(serializers.Serializer):
@@ -68,7 +69,14 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
                 required=False,
                 type=str,
                 location=OpenApiParameter.QUERY,
-            )
+            ),
+            OpenApiParameter(
+                name="title",
+                description="Book title, up to a maximum of 128 characters.",
+                required=False,
+                type=str,
+                location=OpenApiParameter.QUERY,
+            ),
         ],
         responses={
             200: _BestSellersResponseSerializer,
@@ -98,11 +106,13 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
 
         - offset query param
         - isbn[] query param
-        - title query param
+        - caching
         """
         filter_params = {}
         if "author" in request.query_params:
             filter_params["author"] = request.query_params["author"]
+        if "title" in request.query_params:
+            filter_params["title"] = request.query_params["title"]
 
         filter_criteria_serializer = _BestSellersFilterSerializer(data=filter_params)
         filter_criteria_serializer.is_valid(raise_exception=True)

@@ -6,26 +6,33 @@ from requests.exceptions import Timeout as TimeoutException
 
 
 @pytest.fixture
-def tolkien_books():
-    """
-    Data fixture usable in tests below. Data provided by The New York Times.
-    """
+def book_with_long_title():
     return {
-        "num_results": 2,
-        "results": [
-            {
-                "author": "JRR Tolkien",
-                "title": "BEREN AND LÚTHIEN",
-                "isbns": [{"isbn10": "1328791823", "isbn13": "9781328791825"}],
-            },
-            {
-                "author": "JRR Tolkien",
-                "title": "THE FALL OF GONDOLIN",
-                "isbns": [
-                    {"isbn10": "1328613046", "isbn13": "9781328613042"},
-                    {"isbn10": "1328612996", "isbn13": "9781328612991"},
-                ],
-            },
+        "author": "Test Author",
+        "title": "The Life and Times of a Test Author: A Test Data Story Told as an Epic Poem with Supplementary Commentary by Several Other Test Authors (Abridged)",  # noqa: E501
+        "isbns": [{"isbn10": "fake", "isbn13": "fake"}],
+    }
+
+
+@pytest.fixture
+def book_beren_and_luthien():
+    """Data provided by The New York Times."""
+    return {
+        "author": "JRR Tolkien",
+        "title": "BEREN AND LÚTHIEN",
+        "isbns": [{"isbn10": "1328791823", "isbn13": "9781328791825"}],
+    }
+
+
+@pytest.fixture
+def book_the_fall_of_goldolin():
+    """Data provided by The New York Times."""
+    return {
+        "author": "JRR Tolkien",
+        "title": "THE FALL OF GONDOLIN",
+        "isbns": [
+            {"isbn10": "1328613046", "isbn13": "9781328613042"},
+            {"isbn10": "1328612996", "isbn13": "9781328612991"},
         ],
     }
 
@@ -122,7 +129,9 @@ class TestNYTBestSellersViewSetView:
                 "detail": "Request timed out while retrieving data from source API."
             }
 
-    def test_endpoint_validates_the_author_query_param(self, client, django_user_model, tolkien_books):
+    def test_endpoint_validates_the_author_query_param(
+        self, client, django_user_model, book_beren_and_luthien, book_the_fall_of_goldolin
+    ):
         """
         Endpoint returns HTTP 200 if the `author` query parameter is provided and passes validation. Returns HTTP 400 if
         the `author` query parameter is passed with a length greater than 32 characters.
@@ -132,10 +141,15 @@ class TestNYTBestSellersViewSetView:
 
         with patch(
             "requests.get",
-            Mock(side_effect=[
-                Mock(status_code=200, json=lambda: tolkien_books),
-                Mock(status_code=200, json=lambda: { "num_results": 0, "results": [] }),
-            ]),
+            Mock(
+                side_effect=[
+                    Mock(
+                        status_code=200,
+                        json=lambda: {"num_results": 2, "results": [book_beren_and_luthien, book_the_fall_of_goldolin]},
+                    ),
+                    Mock(status_code=200, json=lambda: {"num_results": 0, "results": []}),
+                ]
+            ),
         ) as mock_integration_http_call:
             assert mock_integration_http_call.call_count == 0
 
@@ -145,24 +159,9 @@ class TestNYTBestSellersViewSetView:
 
             assert mock_integration_http_call.call_count == 1
             assert response_valid_query_params.status_code == 200
-            # Repetitive to make sure the fixture data is actually returned.
             assert response_valid_query_params.json() == {
                 "num_results": 2,
-                "results": [
-                    {
-                        "author": "JRR Tolkien",
-                        "title": "BEREN AND LÚTHIEN",
-                        "isbns": [{"isbn10": "1328791823", "isbn13": "9781328791825"}],
-                    },
-                    {
-                        "author": "JRR Tolkien",
-                        "title": "THE FALL OF GONDOLIN",
-                        "isbns": [
-                            {"isbn10": "1328613046", "isbn13": "9781328613042"},
-                            {"isbn10": "1328612996", "isbn13": "9781328612991"},
-                        ],
-                    },
-                ],
+                "results": [book_beren_and_luthien, book_the_fall_of_goldolin],
             }
 
             # Boundary case.
@@ -173,11 +172,49 @@ class TestNYTBestSellersViewSetView:
             assert mock_integration_http_call.call_count == 2
             assert response_valid_query_params.status_code == 200
             # Repetitive to make sure the fixture data is actually returned.
-            assert response_valid_query_params.json() == { "num_results": 0, "results": [] }
+            assert response_valid_query_params.json() == {"num_results": 0, "results": []}
 
-        response = client.get(
-            f"/api/v1/nyt-best-sellers/?{urlencode({'author': 'THIS_STRING_IS_33_CHARACTERS_BBBB'})}"
-        )
+        response = client.get(f"/api/v1/nyt-best-sellers/?{urlencode({'author': 'THIS_STRING_IS_33_CHARACTERS_BBBB'})}")
         assert mock_integration_http_call.call_count == 2
         assert response.status_code == 400
         assert response.json() == {"author": ["Ensure this field has no more than 32 characters."]}
+
+    def test_endpoint_validates_the_title_query_param(self, client, django_user_model, book_with_long_title):
+        """
+        Endpoint returns HTTP 200 if the `title` query parameter is provided and passes validation. Returns HTTP 400 if
+        the `title` query parameter is passed with a length greater than 128 characters.
+        """
+        user = django_user_model.objects.create_user(username="user+1@test.com", password="test123")
+        client.force_login(user)
+
+        with patch(
+            "requests.get",
+            Mock(
+                return_value=Mock(status_code=200, json=lambda: {"num_results": 1, "results": [book_with_long_title]})
+            ),
+        ) as mock_integration_http_call:
+            assert mock_integration_http_call.call_count == 0
+
+            response_valid_query_params = client.get(
+                f"/api/v1/nyt-best-sellers/?{urlencode({'title': 'The Life and Times of a Test Author'})}"
+            )
+
+            assert mock_integration_http_call.call_count == 1
+            assert response_valid_query_params.status_code == 200
+            assert response_valid_query_params.json() == {"num_results": 1, "results": [book_with_long_title]}
+
+            # Boundary case.
+            response_valid_query_params = client.get(
+                f"/api/v1/nyt-best-sellers/?{urlencode({'title': 'The Life and Times of a Test Author: A Test Data Story Told as an Epic Poem with Supplementary Commentary by Several Other Test '})}"  # noqa: E501
+            )
+
+            assert mock_integration_http_call.call_count == 2
+            assert response_valid_query_params.status_code == 200
+            assert response_valid_query_params.json() == {"num_results": 1, "results": [book_with_long_title]}
+
+        response = client.get(
+            f"/api/v1/nyt-best-sellers/?{urlencode({'title': 'Another Extremely Long Title That Exceeds the 128 Character Limit for this Test Case: The Epic Story of How I Wrote a Very Long String'})}"  # noqa: E501
+        )
+        assert mock_integration_http_call.call_count == 2
+        assert response.status_code == 400
+        assert response.json() == {"title": ["Ensure this field has no more than 128 characters."]}
