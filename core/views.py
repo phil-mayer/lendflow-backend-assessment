@@ -1,9 +1,8 @@
 import logging
 
-from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, OpenApiTypes, extend_schema
 from requests.exceptions import Timeout as TimeoutException
 from rest_framework import permissions, serializers, status, viewsets
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .exceptions import BadGatewayException, GatewayTimeoutException, ServerException
@@ -65,7 +64,7 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
         parameters=[
             OpenApiParameter(
                 name="author",
-                description="Author name.",
+                description="Author name, up to a maximum of 32 characters.",
                 required=False,
                 type=str,
                 location=OpenApiParameter.QUERY,
@@ -73,7 +72,18 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
         ],
         responses={
             200: _BestSellersResponseSerializer,
-            400: serializers.ValidationError,
+            400: OpenApiResponse(
+                description="Bad request, typically due to invalid query parameters.",
+                response=OpenApiTypes.OBJECT,
+                examples=[
+                    OpenApiExample(
+                        "HTTP 400 Example",
+                        response_only=True,
+                        summary="Author name too long",
+                        value={"author": ["Ensure this field has no more than 32 characters."]},
+                    ),
+                ],
+            ),
         },
     )
     def list(self, request, *args, **kwargs):

@@ -1,7 +1,33 @@
 from unittest.mock import Mock, patch
 
 import pytest
+from django.utils.http import urlencode
 from requests.exceptions import Timeout as TimeoutException
+
+
+@pytest.fixture
+def tolkien_books():
+    """
+    Data fixture usable in tests below. Data provided by The New York Times.
+    """
+    return {
+        "num_results": 2,
+        "results": [
+            {
+                "author": "JRR Tolkien",
+                "title": "BEREN AND LÚTHIEN",
+                "isbns": [{"isbn10": "1328791823", "isbn13": "9781328791825"}],
+            },
+            {
+                "author": "JRR Tolkien",
+                "title": "THE FALL OF GONDOLIN",
+                "isbns": [
+                    {"isbn10": "1328613046", "isbn13": "9781328613042"},
+                    {"isbn10": "1328612996", "isbn13": "9781328612991"},
+                ],
+            },
+        ],
+    }
 
 
 @pytest.mark.django_db
@@ -64,34 +90,94 @@ class TestNYTBestSellersViewSetView:
         ) as mock_integration_http_call:
             assert mock_integration_http_call.call_count == 0
 
-            response_with_204_side_effect = client.get("/api/v1/nyt-best-sellers/")
+            response_204_side_effect = client.get("/api/v1/nyt-best-sellers/")
 
             assert mock_integration_http_call.call_count == 1
-            assert response_with_204_side_effect.status_code == 500
-            assert response_with_204_side_effect.json() == {"detail": "Failed to retrieve data from source API."}
+            assert response_204_side_effect.status_code == 500
+            assert response_204_side_effect.json() == {"detail": "Failed to retrieve data from source API."}
 
-            response_with_301_side_effect = client.get("/api/v1/nyt-best-sellers/")
+            response_301_side_effect = client.get("/api/v1/nyt-best-sellers/")
 
             assert mock_integration_http_call.call_count == 2
-            assert response_with_301_side_effect.status_code == 500
-            assert response_with_301_side_effect.json() == {"detail": "Failed to retrieve data from source API."}
+            assert response_301_side_effect.status_code == 500
+            assert response_301_side_effect.json() == {"detail": "Failed to retrieve data from source API."}
 
-            response_with_400_side_effect = client.get("/api/v1/nyt-best-sellers/")
+            response_400_side_effect = client.get("/api/v1/nyt-best-sellers/")
 
             assert mock_integration_http_call.call_count == 3
-            assert response_with_400_side_effect.status_code == 500
-            assert response_with_400_side_effect.json() == {"detail": "Failed to retrieve data from source API."}
+            assert response_400_side_effect.status_code == 500
+            assert response_400_side_effect.json() == {"detail": "Failed to retrieve data from source API."}
 
-            response_with_500_side_effect = client.get("/api/v1/nyt-best-sellers/")
+            response_500_side_effect = client.get("/api/v1/nyt-best-sellers/")
 
             assert mock_integration_http_call.call_count == 4
-            assert response_with_500_side_effect.status_code == 502
-            assert response_with_500_side_effect.json() == {"detail": "Source API error."}
+            assert response_500_side_effect.status_code == 502
+            assert response_500_side_effect.json() == {"detail": "Source API error."}
 
-            response_with_timeout_side_effect = client.get("/api/v1/nyt-best-sellers/")
+            response_timeout_side_effect = client.get("/api/v1/nyt-best-sellers/")
 
             assert mock_integration_http_call.call_count == 5
-            assert response_with_timeout_side_effect.status_code == 504
-            assert response_with_timeout_side_effect.json() == {
+            assert response_timeout_side_effect.status_code == 504
+            assert response_timeout_side_effect.json() == {
                 "detail": "Request timed out while retrieving data from source API."
             }
+
+    def test_endpoint_validates_the_author_query_param(self, client, django_user_model, tolkien_books):
+        """
+        Endpoint returns HTTP 200 if the `author` query parameter is provided and passes validation. Returns HTTP 400 if
+        the `author` query parameter is passed with a length greater than 32 characters.
+        """
+        user = django_user_model.objects.create_user(username="user+1@test.com", password="test123")
+        client.force_login(user)
+
+        with patch(
+            "requests.get",
+            Mock(side_effect=[
+                Mock(status_code=200, json=lambda: tolkien_books),
+                Mock(status_code=200, json=lambda: { "num_results": 0, "results": [] }),
+            ]),
+        ) as mock_integration_http_call:
+            assert mock_integration_http_call.call_count == 0
+
+            response_valid_query_params = client.get(
+                f"/api/v1/nyt-best-sellers/?{urlencode({'author': 'JRR Tolkien'})}"
+            )
+
+            assert mock_integration_http_call.call_count == 1
+            assert response_valid_query_params.status_code == 200
+            # Repetitive to make sure the fixture data is actually returned.
+            assert response_valid_query_params.json() == {
+                "num_results": 2,
+                "results": [
+                    {
+                        "author": "JRR Tolkien",
+                        "title": "BEREN AND LÚTHIEN",
+                        "isbns": [{"isbn10": "1328791823", "isbn13": "9781328791825"}],
+                    },
+                    {
+                        "author": "JRR Tolkien",
+                        "title": "THE FALL OF GONDOLIN",
+                        "isbns": [
+                            {"isbn10": "1328613046", "isbn13": "9781328613042"},
+                            {"isbn10": "1328612996", "isbn13": "9781328612991"},
+                        ],
+                    },
+                ],
+            }
+
+            # Boundary case.
+            response_valid_query_params = client.get(
+                f"/api/v1/nyt-best-sellers/?{urlencode({'author': 'A_32_CHARACTER_LONG_STRING_AAAAA'})}"
+            )
+
+            assert mock_integration_http_call.call_count == 2
+            assert response_valid_query_params.status_code == 200
+            # Repetitive to make sure the fixture data is actually returned.
+            assert response_valid_query_params.json() == { "num_results": 0, "results": [] }
+
+        response = client.get(
+            f"/api/v1/nyt-best-sellers/?{urlencode({'author': 'THIS_STRING_IS_33_CHARACTERS_BBBB'})}"
+        )
+        assert mock_integration_http_call.call_count == 2
+        assert response.status_code == 400
+        assert response.json() == {"author": ["Ensure this field has no more than 32 characters."]}
