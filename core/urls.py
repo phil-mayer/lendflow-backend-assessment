@@ -3,5 +3,9 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path("collections/nyt/books/best-sellers", views.BestSellersView.as_view(), name="index"),
+    path(
+        "nyt-best-sellers/",
+        views.NYTBestSellersViewSet.as_view({"get": "list"}),
+        name="nyt-best-sellers",
+    ),
 ]

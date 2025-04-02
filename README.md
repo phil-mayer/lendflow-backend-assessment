@@ -4,26 +4,26 @@ This repo contains my (Phil Mayer's) solution for Lendflow's backend skills asse
 
 ## Requirements
 
-- A version of Docker (e.g. Docker Desktop for Mac) supporting Compose >= 2.22.0, required for [Compose Develop](https://docs.docker.com/reference/compose-file/develop/). To check the Compose version, run `docker compose version`. If your system only supports the `docker-compose` syntax, you likely need to upgrade Docker.
+- A version of Docker supporting the newer `docker compose` syntax. If your version of Docker only supports the legacy `docker-compose` syntax, you may need to upgrade. Tested on with Docker Desktop v4.39.0.
 - (Optional) An editor or IDE capable of attaching to a Docker container, e.g. VS Code. Particularly useful if you want to run the application in debug mode, but also for full syntax highlighting, autocompletion, etc.
 
 ## Setup
 
-The following steps detail how to start the application with Docker. To use the container for development, additional steps are required -- see the next sub-section.
+The following steps detail how to start the application with Docker. To use the container for development, additional steps are listed in the first sub-section below.
 
-1. Copy `.env.example` to `.env` and change the values, particularly the `DJANGO_SECRET_KEY` and `POSTGRES_*` entries.
-2. Fetch and build the Docker images via `docker compose build`. While we could simply run `docker compose up` at this point, this allows us to run the database migrations before taking the entire stack up.
+1. Copy `.env.example` to `.env` and change the values, particularly the `DJANGO_SECRET_KEY`, `POSTGRES_*`, and `NYT_` entries.
+2. Fetch and build the Docker images via `docker compose build`. While we could simply run `docker compose up` at this point, this allows us to run the database migrations before taking up the entire stack.
 3. Run `docker compose run web bash -c "python manage.py migrate"` to temporarily start the database and migrate it.
 4. Run `docker compose up` (optionally with the `-d` flag to detach) to start the application.
-5. Run `docker compose run web bash -c "python manage.py createsuperuser"` to create a user account for yourself.
+5. Run `docker compose exec -it web bash -c "python manage.py createsuperuser"` to create a user account for yourself. For technical discussion of the decision to use a superuser account, see the next section.
 
 ### Using the Application
 
 Once the application is running, navigate to [http://localhost:8000/admin/login/](http://localhost:8000/admin/login/) and log in with your user account created in the last step. On successful login, a cookie will be set in the browser. API requests can now be made directly using the same session.
 
-> 📘 Side note: If the application had permissions, I would have recommended creating a second non-super user for testing. I chose not to implement fine-grained permissions at this point due to time, but also because Django permissions need to be associated with a model (i.e. a Django "content-type"). The permissions can then be understood as actions on objects or collections of objects, e.g. "Can list books".
+For ease of querying the API, a [Swagger UI](https://swagger.io/tools/swagger-ui/) integration is provided. Navigate to [http://localhost:8000/api/schema/swagger-ui/](http://localhost:8000/api/schema/swagger-ui/) to view the endpoint documentation and fire off sample requests.
 
-To query for New York Times Best Seller books, navigate to [http://localhost:8000/collections/nyt/books/best-sellers](http://localhost:8000/collections/nyt/books/best-sellers).
+> 📘 Note: If the application had permissions, I would have recommended creating a second non-super user for testing. I chose not to implement fine-grained authorization due to time, but also because Django permissions are typically associated with models (i.e. Django "content-types"). In a regular CRUD use-case, Django permissions can be understood as actions on objects or collections of objects, e.g. "can list books". Since this application is just a proxy, I didn't see a need to create any models, hence permissions. There are workarounds, but they felt like overkill for this assignment.
 
 ### Development Setup (Optional)
 
@@ -38,19 +38,21 @@ In addition, it may be useful to run the Django application in debug mode to exp
 
 ## Commands
 
-| Operation             | Host Command                                              | Container Command |
-|-----------------------|-----------------------------------------------------------|-------------------|
-| View Application Logs | `docker compose logs -f web`                              | -                 |
-| Lint                  | `docker compose exec -it web bash -c "uv run ruff check"` | uv run ruff check |
-| Run Tests             | TO DO                                                     | -                 |
+| Operation             | Host Command                                               | Container Command  |
+|-----------------------|------------------------------------------------------------|--------------------|
+| View Application Logs | `docker compose logs -f web`                               | -                  |
+| Lint                  | `docker compose exec -it web bash -c "uv run ruff check"`  | uv run ruff check  |
+| Format Code           | `docker compose exec -it web bash -c "uv run ruff format"` | uv run ruff format |
+| Run Tests             | TO DO                                                      | -                  |
 
 ## Technical Notes
 
 - I had never previously used the `uv` package/project manager. I found it to be pretty straightforward and much faster than `pip`.
-- Having previously used `flake8` and `isort` for static code analysis, I decided to try out `ruff`. Not bad!
+- Having previously used `flake8` and `isort` for static code analysis, I decided to try out `ruff`. It's a faster CLI tool rewritten in Rust.
 - I used Astral's [UV documentation for Docker integration](https://docs.astral.sh/uv/guides/integration/docker/) to add Docker support. I leaned heavily on their [sample repository](https://github.com/astral-sh/uv-docker-example/tree/main), tweaking only a few things in the `Dockerfile` and `compose.yaml`. I chose not to use the Compose watch configuration because it does not support two-way file synchronization, and I recommend using dev containers above.
 
 ## Resources Used
 
 - [https://docs.astral.sh/uv/guides/integration/docker/](https://docs.astral.sh/uv/guides/integration/docker/)
 - [https://blog.pecar.me/uv-with-django](https://blog.pecar.me/uv-with-django)
+- [https://www.django-rest-framework.org/topics/documenting-your-api/](https://www.django-rest-framework.org/topics/documenting-your-api/)
