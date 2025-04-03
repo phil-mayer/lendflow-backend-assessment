@@ -13,10 +13,10 @@ from core.services.nyt_api_service import NYTApiService
 
 logger = logging.getLogger(__name__)
 
-
-# The following serializer classes are underscored to indicate that they are private to this file. In a normal Django
-# application, I would consider **models** to be reusable across files/modules. These serializers should be considered
-# part of the "presentation layer" for these routes (i.e. Django views).
+# Note: If you're not familiar with Django and Django REST Framework, I recommend skipping down to line ~169.
+# Since the endpoint is a proxy for another API rather than an interface for CRUD operations on database models, the
+# framework can't automatically generate/discover usage information for the endpoint. Lines 84-167 are essentially
+# configuration/documentation for SwaggerUI.
 
 
 class _BestSellersFilterSerializer(serializers.Serializer):
@@ -166,7 +166,7 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
         },
     )
     @method_decorator(cache_page(60 * 60 * 1))
-    def list(self, request, *args, **kwargs):
+    def list(self, request):
         """
         Retrieve a list of New York Times Books Best Sellers based on the provided filter criteria. This endpoint
         proxies the request to NYT's API, which uses a fixed page size of 20. For this reason, requests to this endpoint
@@ -192,7 +192,9 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
         filter_criteria_serializer.is_valid(raise_exception=True)
 
         try:
-            data = NYTApiService.get_best_sellers(filter_criteria=filter_criteria_serializer.validated_data)
+            source_api_response = NYTApiService.get_best_sellers(
+                filter_criteria=filter_criteria_serializer.validated_data
+            )
         except BadGatewayException as e:
             logger.warning("[NYTBestSellersViewSet] Encountered source API error while retrieving NYT Best Sellers")
             raise BadGatewayException(detail="Source API error.") from e
@@ -205,8 +207,8 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
 
         response_serializer = _BestSellersResponseSerializer(
             {
-                "num_results": data.get("num_results", 0),
-                "results": data.get("results", []),
+                "num_results": source_api_response.get("num_results", 0),
+                "results": source_api_response.get("results", []),
             }
         )
         return Response(data=response_serializer.data, status=status.HTTP_200_OK)
