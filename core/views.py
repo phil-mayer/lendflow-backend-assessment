@@ -125,6 +125,42 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
                     ),
                 ],
             ),
+            500: OpenApiResponse(
+                description="Internal server error, i.e. an unexpected error occurred in this API.",
+                response=OpenApiTypes.OBJECT,
+                examples=[
+                    OpenApiExample(
+                        "HTTP 500 Example",
+                        response_only=True,
+                        summary="Internal server error",
+                        value={"detail": "Failed to retrieve data from source API."},
+                    ),
+                ],
+            ),
+            502: OpenApiResponse(
+                description="Bad Gateway error, i.e. an unexpected error occurred in the source API.",
+                response=OpenApiTypes.OBJECT,
+                examples=[
+                    OpenApiExample(
+                        "HTTP 502 Example",
+                        response_only=True,
+                        summary="Bad Gateway error",
+                        value={"detail": "Source API error."},
+                    ),
+                ],
+            ),
+            504: OpenApiResponse(
+                description="Gateway timeout error, i.e. the request to the source API timed out.",
+                response=OpenApiTypes.OBJECT,
+                examples=[
+                    OpenApiExample(
+                        "HTTP 504 Example",
+                        response_only=True,
+                        summary="Gateway timeout",
+                        value={"detail": "Request timed out while retrieving data from source API."},
+                    ),
+                ],
+            ),
         },
     )
     def list(self, request, *args, **kwargs):
