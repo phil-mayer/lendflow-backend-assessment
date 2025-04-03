@@ -260,3 +260,59 @@ class TestNYTBestSellersViewSetView:
             assert mock_integration_http_call.call_count == 2
             assert response_offset_above_result_limit.status_code == 200
             assert response_offset_above_result_limit.json() == {"num_results": 0, "results": []}
+
+    def test_endpoint_validates_the_isbn_array_query_param(self, client, django_user_model, book_beren_and_luthien):
+        """
+        Endpoint returns HTTP 400 if the `isbn[]` query parameter is passed values of incorrect length (10 or 13
+        characters), contains non-numeric characters, or more than 2 values.
+        """
+        user = django_user_model.objects.create_user(username="user+1@test.com", password="test123")
+        client.force_login(user)
+        # This example violates all validation, but since we use custom Django REST Framework `validators` for this
+        # parameter, the first custom error will be reported.
+        # Also, we can't URL-encode the query parameters in a single call because `urlencode` returns a `dict`.
+        response_all_errors = client.get(
+            f"/api/v1/nyt-best-sellers/?{urlencode({'isbn[]': 1})}&{urlencode({'isbn[]': 'ABCDEFGHIJ'})}&{urlencode({'isbn[]': '1328791823'})}"  # noqa: E501
+        )
+        assert response_all_errors.status_code == 400
+        assert response_all_errors.json() == {"isbn": ["Ensure up to 2 ISBNs are provided."]}
+
+        response_too_many_values = client.get(
+            f"/api/v1/nyt-best-sellers/?{urlencode({'isbn[]': '1328791823'})}&{urlencode({'isbn[]': '1328613046'})}&{urlencode({'isbn[]': '1328612996'})}"  # noqa: E501
+        )
+        assert response_too_many_values.status_code == 400
+        assert response_too_many_values.json() == {"isbn": ["Ensure up to 2 ISBNs are provided."]}
+
+        response_non_numeric_value = client.get(f"/api/v1/nyt-best-sellers/?{urlencode({'isbn[]': 'ABCDEFGHIJ'})}")
+        assert response_non_numeric_value.status_code == 400
+        assert response_non_numeric_value.json() == {"isbn": ["Ensure each ISBN only contains digits."]}
+
+        response_incorrect_length = client.get(f"/api/v1/nyt-best-sellers/?{urlencode({'isbn[]': '1'})}")
+        assert response_incorrect_length.status_code == 400
+        assert response_incorrect_length.json() == {"isbn": ["Ensure each ISBN is either 10 or 13 characters long."]}
+
+        with patch(
+            "requests.get",
+            Mock(
+                side_effect=[
+                    Mock(status_code=200, json=lambda: {"num_results": 1, "results": [book_beren_and_luthien]}),
+                    Mock(status_code=200, json=lambda: {"num_results": 0, "results": []}),
+                ]
+            ),
+        ) as mock_integration_http_call:
+            assert mock_integration_http_call.call_count == 0
+
+            response_one_param = client.get(f"/api/v1/nyt-best-sellers/?{urlencode({'isbn[]': '1328791823'})}")
+            assert mock_integration_http_call.call_count == 1
+            assert response_one_param.status_code == 200
+            assert response_one_param.json() == {"num_results": 1, "results": [book_beren_and_luthien]}
+
+            # Using the two real books in the fixtures above, it doesn't seem that the source NYT API is doing an OR
+            # operation when multiple ISBNs are provided. It might be a bug. For now, this test mimics the behavior I've
+            # observed in production.
+            response_two_params = client.get(
+                f"/api/v1/nyt-best-sellers/?{urlencode({'isbn[]': '1328791823'})}&{urlencode({'isbn[]': '1328613046'})}"
+            )
+            assert mock_integration_http_call.call_count == 2
+            assert response_two_params.status_code == 200
+            assert response_two_params.json() == {"num_results": 0, "results": []}

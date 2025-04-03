@@ -22,13 +22,23 @@ class _BestSellersFilterSerializer(serializers.Serializer):
     Serializer class for the allowed filter criteria (via query params).
     """
 
+    def _validate_isbn_entries(value):
+        isbns = value.split(";")
+        if len(isbns) > 2:
+            raise ValidationError(detail="Ensure up to 2 ISBNs are provided.")
+
+        for isbn in isbns:
+            if len(isbn) not in (10, 13):
+                raise ValidationError(detail="Ensure each ISBN is either 10 or 13 characters long.")
+            if not isbn.isdigit():
+                raise ValidationError(detail="Ensure each ISBN only contains digits.")
+
     def _validate_offset(value):
         if not value % 20 == 0:
             raise ValidationError(detail="Ensure this value is a multiple of 20.")
-        else:
-            return
 
     author = serializers.CharField(max_length=32, required=False)
+    isbn = serializers.CharField(required=False, validators=[_validate_isbn_entries])
     offset = serializers.IntegerField(min_value=0, required=False, validators=[_validate_offset])
     title = serializers.CharField(max_length=128, required=False)
 
@@ -79,6 +89,14 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
                 location=OpenApiParameter.QUERY,
             ),
             OpenApiParameter(
+                name="isbn[]",
+                description="Book ISBN, either ISBN10 or ISBN13. Do not include hyphens. Provide up to two values.",
+                required=False,
+                many=True,
+                type=str,
+                location=OpenApiParameter.QUERY,
+            ),
+            OpenApiParameter(
                 name="offset",
                 description="Result offset. The source API has a fixed page size of 20, so this must be a multiple of 20.",  # noqa: E501
                 required=False,
@@ -118,13 +136,14 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
         Data provided by The New York Times.
 
         TODO: implement the following:
-
-        - isbn[] query param
         - caching
         """
         filter_params = {}
         if "author" in request.query_params:
             filter_params["author"] = request.query_params["author"]
+        if "isbn[]" in request.query_params:
+            raw_isbn_list = request.query_params.copy().pop("isbn[]")
+            filter_params["isbn"] = ";".join(raw_isbn_list)
         if "offset" in request.query_params:
             filter_params["offset"] = request.query_params["offset"]
         if "title" in request.query_params:
