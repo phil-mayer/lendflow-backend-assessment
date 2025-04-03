@@ -100,9 +100,20 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "HOST": os.getenv("POSTGRES_HOST", default="db"),
+        "PORT": os.getenv("POSTGRES_PORT", default=5432),
         "NAME": os.getenv("POSTGRES_DB"),
         "USER": os.getenv("POSTGRES_USER"),
         "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
+    }
+}
+
+# Cache
+# https://docs.djangoproject.com/en/5.1/topics/cache
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": f"redis://{os.getenv("REDIS_HOST", default="cache")}:{os.getenv("REDIS_PORT", default=6379)}",
     }
 }
 
