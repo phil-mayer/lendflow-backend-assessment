@@ -158,3 +158,8 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# NYT Integration
+
+NYT_API_KEY = os.getenv("NYT_API_KEY", "")
+NYT_BEST_SELLERS_ENDPOINT_URL = os.getenv("NYT_BEST_SELLERS_ENDPOINT_URL", "")

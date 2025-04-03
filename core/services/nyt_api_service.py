@@ -1,11 +1,20 @@
 import logging
 from os import getenv
+from typing import NotRequired, TypedDict
 
 import requests
+from django.conf import settings
 
 from core.exceptions import BadGatewayException
 
 logger = logging.getLogger(__name__)
+
+
+class FilterCriteria(TypedDict):
+    author: NotRequired[str]
+    isbn: NotRequired[str]
+    offset: NotRequired[int]
+    title: NotRequired[str]
 
 
 class NYTApiService:
@@ -14,15 +23,16 @@ class NYTApiService:
     making requests, and handling responses.
     """
 
-    def get_best_sellers(filter_criteria):
+    @staticmethod
+    def get_best_sellers(**kwargs: FilterCriteria):
         """
         Retrieve a list of NYT Books Best Sellers from the source API. Any response code other than HTTP 200 (OK) is
         considered an error because HTTP 200 is the only listed successful response code on the NYT API documentation
         site.
         """
-        params = {**filter_criteria, "api-key": getenv("NYT_API_KEY")}
+        params = {**kwargs, "api-key": settings.NYT_API_KEY}
         response = requests.get(
-            url=getenv("NYT_BEST_SELLERS_ENDPOINT_URL"),
+            url=settings.NYT_BEST_SELLERS_ENDPOINT_URL,
             params=params,
             headers={"Accept": "application/json"},
             allow_redirects=False,

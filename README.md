@@ -39,6 +39,7 @@ This will install the `pytest` and `ruff` (a static code analysis tool) dependen
 ```sh
 uv run ruff check # lint
 uv run ruff format # format
+uv run mypy # static type checking
 uv run pytest # run test suite
 ```
 
@@ -64,7 +65,6 @@ Alternatively, direct calls against `http://localhost:8000/api/v1/nyt-best-selle
 - For caching, I chose to add a Redis instance to the Docker Compose stack. Similar to the note above on PostgreSQL, Django's in-memory cache would have also sufficed.
 - I decided to add Swagger UI to improve usability and discoverability of the main endpoint.
 - While testing out the application, you may notice that the endpoints end in a trailing slash (`/`) by default. I decided to keep this behavior because it's common practice/configuration for a Django application.
-- Aside from the tooling present in this repo, adding the `mypy` in the future would further enhance developer experience. The tool allows adding type hints and static type checking.
 - I had never previously used the `uv` package/project manager. I found it to be pretty straightforward and much faster than `pip`.
 - Having previously used `flake8` and `isort` for static code analysis, I decided to try out `ruff`. It's a **much** faster CLI tool rewritten in Rust.
 - I used Astral's [UV documentation for Docker integration](https://docs.astral.sh/uv/guides/integration/docker/) to add Docker support. I leaned heavily on their [sample repository](https://github.com/astral-sh/uv-docker-example/tree/main), tweaking only a few things in the `Dockerfile` and `compose.yaml`. I chose not to use the Compose watch configuration because it does not support two-way file synchronization, and I recommend using dev containers above.

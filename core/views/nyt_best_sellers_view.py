@@ -7,6 +7,7 @@ from requests.exceptions import Timeout as TimeoutException
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from rest_framework.serializers import ListSerializer
 
 from core.exceptions import BadGatewayException, GatewayTimeoutException, ServerException
 from core.services.nyt_api_service import NYTApiService
@@ -19,25 +20,27 @@ logger = logging.getLogger(__name__)
 # configuration/documentation for SwaggerUI.
 
 
+def _validate_isbn_entries(value: str) -> None:
+    isbns = value.split(";")
+    if len(isbns) > 2:
+        raise ValidationError(detail="Ensure up to 2 ISBNs are provided.")
+
+    for isbn in isbns:
+        if len(isbn) not in (10, 13):
+            raise ValidationError(detail="Ensure each ISBN is either 10 or 13 characters long.")
+        if not isbn.isdigit():
+            raise ValidationError(detail="Ensure each ISBN only contains digits.")
+
+
+def _validate_offset(value: int) -> None:
+    if not value % 20 == 0:
+        raise ValidationError(detail="Ensure this value is a multiple of 20.")
+
+
 class _BestSellersFilterSerializer(serializers.Serializer):
     """
     Serializer class for the allowed filter criteria (via query params).
     """
-
-    def _validate_isbn_entries(value):
-        isbns = value.split(";")
-        if len(isbns) > 2:
-            raise ValidationError(detail="Ensure up to 2 ISBNs are provided.")
-
-        for isbn in isbns:
-            if len(isbn) not in (10, 13):
-                raise ValidationError(detail="Ensure each ISBN is either 10 or 13 characters long.")
-            if not isbn.isdigit():
-                raise ValidationError(detail="Ensure each ISBN only contains digits.")
-
-    def _validate_offset(value):
-        if not value % 20 == 0:
-            raise ValidationError(detail="Ensure this value is a multiple of 20.")
 
     author = serializers.CharField(max_length=32, required=False)
     isbn = serializers.CharField(required=False, validators=[_validate_isbn_entries])
@@ -61,7 +64,7 @@ class _BestSellersModelSerializer(serializers.Serializer):
 
     author = serializers.CharField()
     title = serializers.CharField()
-    isbns = serializers.ListSerializer(child=_IsbnSerializer())
+    isbns: ListSerializer[_IsbnSerializer] = serializers.ListSerializer(child=_IsbnSerializer())
 
 
 class _BestSellersResponseSerializer(serializers.Serializer):
@@ -70,7 +73,9 @@ class _BestSellersResponseSerializer(serializers.Serializer):
     """
 
     num_results = serializers.IntegerField()
-    results = serializers.ListSerializer(child=_BestSellersModelSerializer())
+    results: ListSerializer[_BestSellersModelSerializer] = serializers.ListSerializer(
+        child=_BestSellersModelSerializer()
+    )
 
 
 class NYTBestSellersViewSet(viewsets.ViewSet):
@@ -192,9 +197,7 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
         filter_criteria_serializer.is_valid(raise_exception=True)
 
         try:
-            source_api_response = NYTApiService.get_best_sellers(
-                filter_criteria=filter_criteria_serializer.validated_data
-            )
+            source_api_response = NYTApiService.get_best_sellers(**filter_criteria_serializer.validated_data)
         except BadGatewayException as e:
             logger.warning("[NYTBestSellersViewSet] Encountered source API error while retrieving NYT Best Sellers")
             raise BadGatewayException(detail="Source API error.") from e
