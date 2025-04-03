@@ -1,5 +1,7 @@
 import logging
 
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, OpenApiTypes, extend_schema
 from requests.exceptions import Timeout as TimeoutException
 from rest_framework import permissions, serializers, status, viewsets
@@ -163,16 +165,17 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
             ),
         },
     )
+    @method_decorator(cache_page(60 * 60 * 1))
     def list(self, request, *args, **kwargs):
         """
         Retrieve a list of New York Times Books Best Sellers based on the provided filter criteria. This endpoint
         proxies the request to NYT's API, which uses a fixed page size of 20. For this reason, requests to this endpoint
         must use the returned `num_results` key to paginate through the results with the `offset` query parameter.
 
-        Data provided by The New York Times.
+        Note: the application caches responses for one hour. Django automatically keys the entries by URL, plus some
+        request headers.
 
-        TODO: implement the following:
-        - caching
+        Data provided by The New York Times.
         """
         filter_params = {}
         if "author" in request.query_params:
