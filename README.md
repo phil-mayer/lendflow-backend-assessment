@@ -6,7 +6,7 @@ I recommend running the application and making calls against its provided Swagge
 
 - `config/urls.py`: Top-level route mapping. When running, the application exposes routes for an admin site (very similar to a Laravel), an OpenAPI schema, Swagger UI, and the actual application routes on `/api/v1/`.
 - `core/services/nyt_api_service.py`: Contains the NYT API caller function.
-- `core/views/nyt_best_sellers_view.py`: REST controller (i.e. view set) backing the main endpoint. The top section contains underscored "private" classes used for controller-specific input sanitization and output object mapping. The endpoint implementation can be found below annotations for Swagger UI and cache configuration.
+- `core/views/nyt_best_sellers_view.py`: REST controller (i.e. view set) backing the main endpoint. The top section contains underscored "private" classes used for controller-specific input sanitization and output object mapping. The endpoint implementation can be found below an annotation to configure Swagger UI.
 - `core/tests.py`: Commented endpoint-level tests.
 
 ## Requirements

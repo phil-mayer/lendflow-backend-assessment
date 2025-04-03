@@ -1,7 +1,8 @@
 import logging
 
-from django.utils.decorators import method_decorator
-from django.views.decorators.cache import cache_page
+from django.conf import settings
+from django.core.cache import cache
+from django.utils.http import urlencode
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, OpenApiTypes, extend_schema
 from requests.exceptions import Timeout as TimeoutException
 from rest_framework import permissions, serializers, status, viewsets
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Note: If you're not familiar with Django and Django REST Framework, I recommend skipping down to line ~169.
 # Since the endpoint is a proxy for another API rather than an interface for CRUD operations on database models, the
-# framework can't automatically generate/discover usage information for the endpoint. Lines 84-167 are essentially
+# framework can't automatically generate/discover usage information for the endpoint. Lines 90-173 are essentially
 # configuration/documentation for SwaggerUI.
 
 
@@ -170,7 +171,6 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
             ),
         },
     )
-    @method_decorator(cache_page(60 * 60 * 1))
     def list(self, request):
         """
         Retrieve a list of New York Times Books Best Sellers based on the provided filter criteria. This endpoint
@@ -196,6 +196,11 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
         filter_criteria_serializer = _BestSellersFilterSerializer(data=filter_params)
         filter_criteria_serializer.is_valid(raise_exception=True)
 
+        cache_key = f"NYT_BS_LIST_{urlencode(filter_criteria_serializer.validated_data)}"
+        cached_response_body = cache.get(cache_key)
+        if cached_response_body:
+            return Response(data=cached_response_body, status=status.HTTP_200_OK)
+
         try:
             source_api_response = NYTApiService.get_best_sellers(**filter_criteria_serializer.validated_data)
         except BadGatewayException as e:
@@ -214,4 +219,6 @@ class NYTBestSellersViewSet(viewsets.ViewSet):
                 "results": source_api_response.get("results", []),
             }
         )
+        cache.set(cache_key, response_serializer.data, settings.NYT_BEST_SELLERS_CACHE_TIMEOUT_SECONDS)
+
         return Response(data=response_serializer.data, status=status.HTTP_200_OK)

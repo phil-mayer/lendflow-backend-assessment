@@ -11,6 +11,7 @@ def reset_cache():
     """Clear the application cache before each test run."""
     cache.clear()
 
+
 @pytest.fixture
 def book_with_long_title():
     return {
@@ -322,3 +323,41 @@ class TestNYTBestSellersViewSetView:
             assert mock_integration_http_call.call_count == 2
             assert response_two_params.status_code == 200
             assert response_two_params.json() == {"num_results": 0, "results": []}
+
+    def test_endpoint_uses_cache_for_repeated_calls(self, client, django_user_model, book_beren_and_luthien):
+        """
+        Endpoint uses the cache when repeated calls are made with the same (known) query parameters.
+        """
+        user = django_user_model.objects.create_user(username="user+1@test.com", password="test123")
+        client.force_login(user)
+
+        with patch(
+            "requests.get",
+            Mock(
+                return_value=Mock(status_code=200, json=lambda: {"num_results": 1, "results": [book_beren_and_luthien]})
+            ),
+        ) as mock_integration_http_call:
+            assert mock_integration_http_call.call_count == 0
+
+            response_cache_miss = client.get(
+                f"/api/v1/nyt-best-sellers/?{urlencode({'author': 'JRR Tolkien', 'isbn[]': '1328791823', 'offset': 0, 'title': 'BEREN'})}"  # noqa: E501
+            )
+            assert mock_integration_http_call.call_count == 1
+            assert response_cache_miss.status_code == 200
+            assert response_cache_miss.json() == {"num_results": 1, "results": [book_beren_and_luthien]}
+
+            # Same URL
+            response_cache_hit_unknown_param = client.get(
+                f"/api/v1/nyt-best-sellers/?{urlencode({'author': 'JRR Tolkien', 'isbn[]': '1328791823', 'offset': 0, 'title': 'BEREN'})}"  # noqa: E501
+            )
+            assert mock_integration_http_call.call_count == 1
+            assert response_cache_hit_unknown_param.status_code == 200
+            assert response_cache_hit_unknown_param.json() == {"num_results": 1, "results": [book_beren_and_luthien]}
+
+            # Same URL, extraneous parameter
+            response_cache_hit_unknown_param = client.get(
+                f"/api/v1/nyt-best-sellers/?{urlencode({'unknown-param': 'unknown-value', 'author': 'JRR Tolkien', 'isbn[]': '1328791823', 'offset': 0, 'title': 'BEREN'})}"  # noqa: E501
+            )
+            assert mock_integration_http_call.call_count == 1
+            assert response_cache_hit_unknown_param.status_code == 200
+            assert response_cache_hit_unknown_param.json() == {"num_results": 1, "results": [book_beren_and_luthien]}

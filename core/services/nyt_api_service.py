@@ -1,5 +1,4 @@
 import logging
-from os import getenv
 from typing import NotRequired, TypedDict
 
 import requests
