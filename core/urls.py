@@ -1,11 +1,11 @@
 from django.urls import path
 
-from . import views
+from core.views.nyt_best_sellers_view import NYTBestSellersViewSet
 
 urlpatterns = [
     path(
         "nyt-best-sellers/",
-        views.NYTBestSellersViewSet.as_view({"get": "list"}),
+        NYTBestSellersViewSet.as_view({"get": "list"}),
         name="nyt-best-sellers",
     ),
 ]

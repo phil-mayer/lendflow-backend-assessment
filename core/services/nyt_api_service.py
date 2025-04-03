@@ -3,7 +3,7 @@ from os import getenv
 
 import requests
 
-from .exceptions import BadGatewayException
+from core.exceptions import BadGatewayException
 
 logger = logging.getLogger(__name__)
 

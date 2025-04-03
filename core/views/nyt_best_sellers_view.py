@@ -8,8 +8,8 @@ from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from .exceptions import BadGatewayException, GatewayTimeoutException, ServerException
-from .services import NYTApiService
+from core.exceptions import BadGatewayException, GatewayTimeoutException, ServerException
+from core.services.nyt_api_service import NYTApiService
 
 logger = logging.getLogger(__name__)
 

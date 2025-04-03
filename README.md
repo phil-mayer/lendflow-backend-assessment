@@ -1,6 +1,6 @@
 # Lendflow Backend Assessment
 
-This repo contains my (Phil Mayer's) solution for Lendflow's backend skills assessment.
+This repo contains my (Phil Mayer's) solution for Lendflow's backend skills assessment. Note that this is a Python solution.
 
 ## Requirements
 
@@ -38,20 +38,25 @@ In addition, it may be useful to run the Django application in debug mode to exp
 
 ## Commands
 
+All operations except viewing application logs require the "Development Setup" to have been completed above.
+
 | Operation             | Host Command                                               | Container Command  |
 |-----------------------|------------------------------------------------------------|--------------------|
 | View Application Logs | `docker compose logs -f web`                               | -                  |
 | Lint                  | `docker compose exec -it web bash -c "uv run ruff check"`  | uv run ruff check  |
 | Format Code           | `docker compose exec -it web bash -c "uv run ruff format"` | uv run ruff format |
-| Run Tests             | TO DO                                                      | -                  |
+| Run Tests             | `docker compose exec -it web bash -c "uv run pytest"`      | uv run pytest      |
 
 ## Technical Notes
 
 - I implemented my solution in Python with Django, extended with the Django REST Framework. I aimed to use the framework as much as possible to reduce complexity.
 - To demonstrate knowledge of Docker/Docker Compose, I chose to use PostgreSQL. Given that this application will never enter real usage, SQLite would have worked as well.
 - For caching, I chose to add a Redis instance to the Docker Compose stack. As noted above, given that this application will likely only run locally, Django's in-memory cache would have also sufficed.
+- I decided to add Swagger UI to improve usability and discoverability of the main endpoint.
+- While testing out the application, you may notice that the endpoints end in a trailing slash (`/`) by default. I decided to keep this behavior because it's common practice/configuration for a Django application.
+- Aside from the tooling present in this repo, another good addition would be `mypy` for optional type-checking.
 - I had never previously used the `uv` package/project manager. I found it to be pretty straightforward and much faster than `pip`.
-- Having previously used `flake8` and `isort` for static code analysis, I decided to try out `ruff`. It's a faster CLI tool rewritten in Rust.
+- Having previously used `flake8` and `isort` for static code analysis, I decided to try out `ruff`. It's a **much** faster CLI tool rewritten in Rust.
 - I used Astral's [UV documentation for Docker integration](https://docs.astral.sh/uv/guides/integration/docker/) to add Docker support. I leaned heavily on their [sample repository](https://github.com/astral-sh/uv-docker-example/tree/main), tweaking only a few things in the `Dockerfile` and `compose.yaml`. I chose not to use the Compose watch configuration because it does not support two-way file synchronization, and I recommend using dev containers above.
 
 ## Resources Used
