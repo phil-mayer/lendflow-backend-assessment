@@ -1,9 +1,15 @@
 from unittest.mock import Mock, patch
 
 import pytest
+from django.core.cache import cache
 from django.utils.http import urlencode
 from requests.exceptions import Timeout as TimeoutException
 
+
+@pytest.fixture(autouse=True)
+def reset_cache():
+    """Clear the application cache before each test run."""
+    cache.clear()
 
 @pytest.fixture
 def book_with_long_title():
